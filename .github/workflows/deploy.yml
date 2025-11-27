@@ -3,7 +3,7 @@ name: Build and Push to ECR
 on:
   push:
     branches:
-      - main  # Se activa cuando hace push a la rama main
+      - main
 
 jobs:
   build-and-push:
@@ -14,7 +14,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 2. Configurar credenciales de AWS (Usando los secretos que configuró)
+    # Configurar credenciales de AWS
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
@@ -23,28 +23,24 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} 
         aws-region: us-east-1
 
-    # 3. Iniciar sesión en Amazon ECR
+    # Iniciar sesión en Amazon ECR
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # 4. Construir la imagen Docker y subirla a ECR
+    # Construir y subir imagen
     - name: Build, tag, and push image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: notifications-service-repo
         IMAGE_TAG: latest
       run: |
-        # Construir la imagen
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        # Subir la imagen a AWS
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-
-    # 5. Desplegar en EC2 vía SSH
+    # Desplegar en EC2
     - name: Deploy to EC2
-      uses: appleboy/ssh-action@master  # <--- AQUÍ ESTABA EL ERROR (Faltaba 'master')
+      uses: appleboy/ssh-action@master
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -56,7 +52,7 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION
         script: |
-          # 1. Configurar credenciales explícitamente (Faltaba esto también)
+          # 1. Configurar credenciales en el host
           aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
           aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
           aws configure set aws_session_token $AWS_SESSION_TOKEN
@@ -72,8 +68,11 @@ jobs:
           # 4. Descarga
           docker pull 303339717226.dkr.ecr.us-east-1.amazonaws.com/notifications-service-repo:latest
           
-          # 5. Ejecución (Con sus variables específicas)
+          # 5. Ejecución (PASANDO CREDENCIALES AL CONTENEDOR)
           docker run -d -p 8002:8000 \
+            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+            -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
             -e PYTHONUNBUFFERED=1 \
             -e AWS_REGION="us-east-1" \
             -e APP_ENVIRONMENT="production" \
