@@ -42,25 +42,37 @@ jobs:
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
 
+    # 5. Desplegar en EC2 vía SSH
     - name: Deploy to EC2
-      uses: appleboy/ssh-action@
+      uses: appleboy/ssh-action@master  # <--- AQUÍ ESTABA EL ERROR (Faltaba 'master')
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         AWS_REGION: us-east-1
       with:
-        envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION
         host: ${{ secrets.EC2_HOST }}
         username: ec2-user
         key: ${{ secrets.EC2_SSH_KEY }}
+        envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION
         script: |
+          # 1. Configurar credenciales explícitamente (Faltaba esto también)
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set aws_session_token $AWS_SESSION_TOKEN
+          aws configure set default.region $AWS_REGION
+
+          # 2. Login en ECR
           aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 303339717226.dkr.ecr.us-east-1.amazonaws.com
           
+          # 3. Limpieza
           docker stop notifications-service || true
           docker rm notifications-service || true
+          
+          # 4. Descarga
           docker pull 303339717226.dkr.ecr.us-east-1.amazonaws.com/notifications-service-repo:latest
           
+          # 5. Ejecución (Con sus variables específicas)
           docker run -d -p 8002:8000 \
             -e PYTHONUNBUFFERED=1 \
             -e AWS_REGION="us-east-1" \
