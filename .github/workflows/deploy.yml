@@ -40,3 +40,30 @@ jobs:
         # Subir la imagen a AWS
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 303339717226.dkr.ecr.us-east-1.amazonaws.com
+          
+          docker stop notifications-service || true
+          docker rm notifications-service || true
+          docker pull 303339717226.dkr.ecr.us-east-1.amazonaws.com/notifications-service-repo:latest
+          
+          docker run -d -p 8002:8000 \
+            -e PYTHONUNBUFFERED=1 \
+            -e AWS_REGION="us-east-1" \
+            -e APP_ENVIRONMENT="production" \
+            -e SQS_QUEUE_URL="https://sqs.us-east-1.amazonaws.com/303339717226/SalesNotificationsQueue" \
+            -e BUCKET_NAME="739788-esi3898k-examen1" \
+            -e TABLE_CUSTOMERS="Customers" \
+            -e TABLE_NOTES="SalesNotes" \
+            -e TABLE_ITEMS="SalesNoteItems" \
+            -e TABLE_PRODUCTS="Products" \
+            --name notifications-service \
+            303339717226.dkr.ecr.us-east-1.amazonaws.com/notifications-service-repo:latest
