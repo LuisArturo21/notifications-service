@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="Notifications Worker")
-#test
+#test f
 ENV = os.getenv("APP_ENVIRONMENT", "local")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 SQS_QUEUE_URL = os.getenv("SQS_QUEUE_URL") 
@@ -36,7 +36,7 @@ class PDF(FPDF):
         self.ln(5)
 
 async def sqs_worker():
-    print(f"👷 Worker iniciado. Escuchando: {SQS_QUEUE_URL}")
+    print(f" Worker iniciado. Escuchando: {SQS_QUEUE_URL}")
     while True:
         try:
             response = sqs.receive_message(
@@ -71,7 +71,7 @@ async def process_message(sqs_message):
             note_id = body.get('noteId')
 
         if not note_id:
-            print("⚠️ No se encontró noteId en el mensaje")
+            print(" No se encontró noteId en el mensaje")
             return
 
         print(f" Procesando Nota ID: {note_id}")
